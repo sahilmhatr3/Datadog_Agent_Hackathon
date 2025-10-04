@@ -87,19 +87,6 @@ function extractLocationFromText(text: string) {
   return null;
 }
 
-function formatLocationLabel(location?: LocationInfo) {
-  if (!location) {
-    return undefined;
-  }
-
-  if (location.label) {
-    return location.label;
-  }
-
-  const parts = [location.city, location.country].filter(Boolean);
-  return parts.length ? parts.join(", ") : undefined;
-}
-
 const inviteNotifications: SessionInvitePreview[] = [
   {
     id: "invite-demo-paris",
@@ -306,15 +293,6 @@ export function ScoutHome() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             New Search
           </Button>
-          {formatLocationLabel(mapLocation ?? userLocation) && (
-            <p className="text-sm text-muted-foreground">
-              Map is centered on{" "}
-              <span className="font-medium">
-                {formatLocationLabel(mapLocation ?? userLocation)}
-              </span>
-              .
-            </p>
-          )}
         </div>
         <div className="flex-1 px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 overflow-hidden">
           <ChatInterface
