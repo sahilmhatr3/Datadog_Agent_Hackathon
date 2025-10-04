@@ -1,0 +1,21 @@
+# Scout Navigation App - Python Dependencies
+
+# Core dependencies for natural language processing
+openhands-ai>=1.0.0  # OpenHands SDK for AI agent processing
+
+# Additional dependencies for enhanced functionality
+requests>=2.31.0     # HTTP requests for API calls
+python-dateutil>=2.8.2  # Date/time parsing utilities
+pydantic>=2.0.0      # Data validation and settings management
+
+# Development and testing dependencies
+pytest>=7.0.0        # Testing framework
+pytest-cov>=4.0.0    # Coverage reporting
+black>=23.0.0        # Code formatting
+flake8>=6.0.0        # Linting
+mypy>=1.0.0          # Type checking
+
+# Optional: For advanced NLP features
+# spacy>=3.6.0        # Advanced NLP processing
+# transformers>=4.30.0  # Hugging Face transformers
+# torch>=2.0.0        # PyTorch for ML models

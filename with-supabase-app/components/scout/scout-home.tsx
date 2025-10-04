@@ -5,6 +5,9 @@ import { SearchBar } from "./search-bar";
 import { MapView } from "./map-view";
 import { ChatInterface } from "./chat-interface";
 import { PreviousSessions } from "./previous-sessions";
+import { SessionInvites } from "./session-invites";
+import type { SessionInvitePreview } from "./session-invites";
+import { InviteCollaboratorCard } from "./invite-collaborator-card";
 import { Sparkles, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -84,6 +87,150 @@ function extractLocationFromText(text: string) {
   return null;
 }
 
+function formatLocationLabel(location?: LocationInfo) {
+  if (!location) {
+    return undefined;
+  }
+
+  if (location.label) {
+    return location.label;
+  }
+
+  const parts = [location.city, location.country].filter(Boolean);
+  return parts.length ? parts.join(", ") : undefined;
+}
+
+const inviteNotifications: SessionInvitePreview[] = [
+  {
+    id: "invite-demo-paris",
+    sessionId: "session-paris-weekend",
+    sessionTitle: "Paris Culinary Weekend",
+    destination: "Paris, France",
+    inviterName: "Mila Chen",
+    inviterEmail: "mila@example.com",
+    status: "pending",
+    createdAt: "2025-01-12T10:00:00.000Z",
+    message:
+      "Need your take on which markets to roam and where to end the night — help us decide!",
+    participants: [
+      {
+        userId: "user-mila",
+        name: "Mila Chen",
+        lastContributionAt: "2025-01-12T16:20:00.000Z",
+        ideaSummary:
+          "Prioritizing natural wine bars and a Sunday brunch spot with a skyline view.",
+        topRecommendations: [
+          {
+            id: "rec-mila-1",
+            placeName: "Septime La Cave",
+            city: "11th Arr.",
+            matchScore: 93,
+          },
+          {
+            id: "rec-mila-2",
+            placeName: "Hardware Société",
+            city: "Montmartre",
+            matchScore: 87,
+          },
+        ],
+      },
+      {
+        userId: "user-alex",
+        name: "Alex Rivera",
+        lastContributionAt: "2025-01-12T14:05:00.000Z",
+        ideaSummary:
+          "Wants a patisserie crawl near Le Marais and a late-night jazz lounge near the Seine.",
+        topRecommendations: [
+          {
+            id: "rec-alex-1",
+            placeName: "Du Pain et des Idées",
+            city: "Canal Saint-Martin",
+            matchScore: 89,
+          },
+          {
+            id: "rec-alex-2",
+            placeName: "Le Duc des Lombards",
+            city: "Les Halles",
+            matchScore: 82,
+          },
+        ],
+      },
+    ],
+    aggregateSummary: {
+      summary:
+        "Group leans toward a cozy Right Bank evening with a wine crawl, dessert sprint, and jazz wind-down by the river.",
+      highlights: [
+        "Natural wine crawl",
+        "Patisserie sprint",
+        "Late-night jazz",
+      ],
+    },
+  },
+  {
+    id: "invite-demo-lisbon",
+    sessionId: "session-lisbon-focus",
+    sessionTitle: "Lisbon Remote Work Sprint",
+    destination: "Lisbon, Portugal",
+    inviterName: "Jordan Blake",
+    inviterEmail: "jordan@example.com",
+    status: "pending",
+    createdAt: "2025-01-10T18:30:00.000Z",
+    participants: [
+      {
+        userId: "user-jordan",
+        name: "Jordan Blake",
+        lastContributionAt: "2025-01-12T09:10:00.000Z",
+        ideaSummary:
+          "Scoping sunny cowork cafés near the river with evening tapas to celebrate finishing sprints.",
+        topRecommendations: [
+          {
+            id: "rec-jordan-1",
+            placeName: "Hello, Kristof",
+            city: "Cais do Sodré",
+            matchScore: 85,
+          },
+          {
+            id: "rec-jordan-2",
+            placeName: "Time Out Market Lisboa",
+            city: "Mercado da Ribeira",
+            matchScore: 80,
+          },
+        ],
+      },
+      {
+        userId: "user-sky",
+        name: "Sky Patel",
+        lastContributionAt: "2025-01-11T20:45:00.000Z",
+        ideaSummary:
+          "Looking for miradouros for sunset breaks and a fado spot to share with the crew.",
+        topRecommendations: [
+          {
+            id: "rec-sky-1",
+            placeName: "Miradouro da Senhora do Monte",
+            city: "Graça",
+            matchScore: 88,
+          },
+          {
+            id: "rec-sky-2",
+            placeName: "Clube de Fado",
+            city: "Alfama",
+            matchScore: 83,
+          },
+        ],
+      },
+    ],
+    aggregateSummary: {
+      summary:
+        "Team needs bright cafés for daytime focus and wants to stack tapas with sunset viewpoints plus a fado night treat.",
+      highlights: [
+        "Cowork cafés",
+        "Tapas wind-down",
+        "Sunset + fado combo",
+      ],
+    },
+  },
+];
+
 export function ScoutHome() {
   const [isSearching, setIsSearching] = useState(false);
   const [currentQuery, setCurrentQuery] = useState<string>("");
@@ -159,6 +306,15 @@ export function ScoutHome() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             New Search
           </Button>
+          {formatLocationLabel(mapLocation ?? userLocation) && (
+            <p className="text-sm text-muted-foreground">
+              Map is centered on{" "}
+              <span className="font-medium">
+                {formatLocationLabel(mapLocation ?? userLocation)}
+              </span>
+              .
+            </p>
+          )}
         </div>
         <div className="flex-1 px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 overflow-hidden">
           <ChatInterface
@@ -188,6 +344,9 @@ export function ScoutHome() {
           places tailored to your preferences.
         </p>
       </div>
+
+      {/* Collaboration Invites */}
+      <SessionInvites invites={inviteNotifications} />
 
       {/* Search Bar */}
       <div className="py-4">

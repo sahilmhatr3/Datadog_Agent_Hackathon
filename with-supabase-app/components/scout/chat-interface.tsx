@@ -93,12 +93,115 @@ export function ChatInterface({
     return DUMMY_ROUTES.find(r => r.route_id === selectedRouteId) || null;
   }, [selectedRouteId]);
 
-  // (Keep all hooks and handler logic as they were)
-  useEffect(() => { /* ... */ }, []);
-  useEffect(() => { /* ... */ }, [messages]);
+  // Initialize with first query message
+  useEffect(() => {
+    if (initialQuery && messages.length === 0) {
+      const initialMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: initialQuery,
+        timestamp: new Date(),
+      };
+      setMessages([initialMessage]);
+      
+      // Mock AI response
+      setTimeout(() => {
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Great! I can help you plan your trip based on: "${initialQuery}". What specific preferences do you have? (cuisine, budget, vibes, etc.)`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiResponse]);
+      }, 1000);
+    }
+  }, [initialQuery]);
 
-  const scrollToBottom = () => { /* ... */ };
-  const handleSubmit = async (e: React.FormEvent) => { /* ... */ };
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedInput = input.trim();
+    if (!trimmedInput || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: trimmedInput,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    onUserMessage?.(trimmedInput);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      // Call the Linkup API
+      const response = await fetch('/api/linkup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: trimmedInput }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Save the Linkup response to a JSON file
+      const responseData = {
+        sessionId: sessionId || `session-${Date.now()}`,
+        query: trimmedInput,
+        response: data,
+        timestamp: new Date().toISOString(),
+        userMessage: userMessage
+      };
+
+      // Save to JSON file via API endpoint
+      await fetch('/api/save-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(responseData),
+      });
+      
+      // Show a generic confirmation message instead of the actual response
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I've processed your request and saved the information. The response has been logged for analysis.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error calling Linkup API:', error);
+      
+      // Fallback to a helpful error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm sorry, I'm having trouble accessing my knowledge base right now. Please try again in a moment, or rephrase your question.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleRouteSelect = (routeId: string) => {
     setSelectedRouteId(routeId);
@@ -114,7 +217,6 @@ export function ChatInterface({
         setMessages(prev => [...prev, confirmationMessage]); 
     }
   };
-
 
   // --- UPDATED LAYOUT RETURN BLOCK ---
   return (
