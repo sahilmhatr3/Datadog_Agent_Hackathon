@@ -349,6 +349,129 @@ export type Database = {
           },
         ]
       }
+      session_participant_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          idea_summary: string | null
+          last_contribution_at: string
+          session_id: string
+          top_recommendation_ids: string[]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idea_summary?: string | null
+          last_contribution_at?: string
+          session_id: string
+          top_recommendation_ids?: string[]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idea_summary?: string | null
+          last_contribution_at?: string
+          session_id?: string
+          top_recommendation_ids?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_participant_snapshots_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_collaboration_summaries: {
+        Row: {
+          created_at: string
+          created_by: string
+          highlights: Json
+          id: string
+          session_id: string
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          highlights?: Json
+          id?: string
+          session_id: string
+          summary?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          highlights?: Json
+          id?: string
+          session_id?: string
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_collaboration_summaries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_invites: {
+        Row: {
+          created_at: string
+          id: string
+          invitee_email: string | null
+          invitee_user_id: string | null
+          inviter_id: string
+          message: string | null
+          metadata: Json
+          responded_at: string | null
+          session_id: string
+          status: Database["public"]["Enums"]["invite_status"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invitee_email?: string | null
+          invitee_user_id?: string | null
+          inviter_id: string
+          message?: string | null
+          metadata?: Json
+          responded_at?: string | null
+          session_id: string
+          status?: Database["public"]["Enums"]["invite_status"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invitee_email?: string | null
+          invitee_user_id?: string | null
+          inviter_id?: string
+          message?: string | null
+          metadata?: Json
+          responded_at?: string | null
+          session_id?: string
+          status?: Database["public"]["Enums"]["invite_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_invites_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_requirements: {
         Row: {
           accessibility: Json | null
@@ -2345,6 +2468,7 @@ export type Database = {
         | "sports"
         | "workshop"
         | "spa"
+      invite_status: "pending" | "accepted" | "declined" | "expired"
       participant_role: "owner" | "editor" | "viewer"
       price_tier: "free" | "$" | "$$" | "$$$" | "$$$$"
       user_place_status: "saved" | "liked" | "booked" | "hidden"
