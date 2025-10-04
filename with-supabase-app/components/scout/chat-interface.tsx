@@ -17,11 +17,13 @@ interface Message {
 interface ChatInterfaceProps {
   initialQuery?: string;
   sessionId?: string;
+  onUserMessage?: (message: string) => void;
 }
 
 export function ChatInterface({
   initialQuery,
   sessionId,
+  onUserMessage,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -45,8 +47,9 @@ export function ChatInterface({
           timestamp: new Date(),
         },
       ]);
+      onUserMessage?.(initialQuery);
     }
-  }, [initialQuery]);
+  }, [initialQuery, onUserMessage]);
 
   useEffect(() => {
     scrollToBottom();
@@ -58,16 +61,18 @@ export function ChatInterface({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const trimmedInput = input.trim();
+    if (!trimmedInput || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: trimmedInput,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    onUserMessage?.(trimmedInput);
     setInput("");
     setIsLoading(true);
 
@@ -201,4 +206,3 @@ export function ChatInterface({
     </Card>
   );
 }
-

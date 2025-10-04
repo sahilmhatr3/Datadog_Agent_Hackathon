@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { SearchBar } from "./search-bar";
 import { MapView } from "./map-view";
 import { ChatInterface } from "./chat-interface";
@@ -8,27 +8,121 @@ import { PreviousSessions } from "./previous-sessions";
 import { Sparkles, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+type LocationInfo = {
+  city?: string;
+  country?: string;
+  lat?: number;
+  lng?: number;
+  label?: string;
+  source?: "user" | "mention";
+};
+
+const LOCATION_STOP_WORDS = new Set([
+  "weekend",
+  "trip",
+  "experience",
+  "adventure",
+  "planning",
+  "plan",
+  "vacation",
+  "getaway",
+  "romantic",
+  "luxury",
+  "food",
+  "tour",
+  "nightlife",
+  "ideas",
+  "guide",
+  "itinerary",
+  "explore",
+]);
+
+const PREPOSITION_PATTERN =
+  /\b(?:in|to|for|around|near|at)\s+([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*|[A-Z]{2,})(?=[\s,.!?]|$)/i;
+
+const CAPITALIZED_PATTERN =
+  /(?:[A-Z][\w]*|[A-Z]{2,})(?:\s+(?:[A-Z][\w]*|[A-Z]{2,}))*/g;
+
+function sanitizeLocationCandidate(candidate: string) {
+  const tokens = candidate
+    .split(/\s+/)
+    .map((token) => token.replace(/[^A-Za-z]/g, ""))
+    .filter(Boolean)
+    .filter((token) => !LOCATION_STOP_WORDS.has(token.toLowerCase()));
+
+  if (!tokens.length) {
+    return null;
+  }
+
+  return tokens.join(" ");
+}
+
+function extractLocationFromText(text: string) {
+  const cleaned = text.trim();
+  if (!cleaned) {
+    return null;
+  }
+
+  const prepositionMatch = cleaned.match(PREPOSITION_PATTERN);
+  if (prepositionMatch) {
+    const candidate = sanitizeLocationCandidate(prepositionMatch[1]);
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  const capitalizedMatches = cleaned.match(CAPITALIZED_PATTERN);
+  if (capitalizedMatches) {
+    for (let i = capitalizedMatches.length - 1; i >= 0; i--) {
+      const candidate = sanitizeLocationCandidate(capitalizedMatches[i]);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+function formatLocationLabel(location?: LocationInfo) {
+  if (!location) {
+    return undefined;
+  }
+
+  if (location.label) {
+    return location.label;
+  }
+
+  const parts = [location.city, location.country].filter(Boolean);
+  return parts.length ? parts.join(", ") : undefined;
+}
+
 export function ScoutHome() {
   const [isSearching, setIsSearching] = useState(false);
   const [currentQuery, setCurrentQuery] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
-  const [userLocation, setUserLocation] = useState<{
-    city?: string;
-    country?: string;
-    lat?: number;
-    lng?: number;
-  }>({});
+  const [userLocation, setUserLocation] = useState<LocationInfo>();
+  const [mapLocation, setMapLocation] = useState<LocationInfo>();
 
   useEffect(() => {
     // Mock user location detection (in production, use geolocation API)
-    setTimeout(() => {
-      setUserLocation({
+    const timeout = setTimeout(() => {
+      const detectedLocation: LocationInfo = {
         city: "San Francisco",
         country: "USA",
         lat: 37.7749,
         lng: -122.4194,
-      });
+        label: "San Francisco, USA",
+        source: "user",
+      };
+
+      setUserLocation(detectedLocation);
+      setMapLocation((current) =>
+        current && current.source === "mention" ? current : detectedLocation,
+      );
     }, 1000);
+
+    return () => clearTimeout(timeout);
   }, []);
 
   const handleSearch = (query: string) => {
@@ -36,12 +130,24 @@ export function ScoutHome() {
     setCurrentQuery(query);
     // Mock session creation
     setSessionId(`session-${Date.now()}`);
+
+    const trimmedQuery = query.trim();
+    const extracted = extractLocationFromText(trimmedQuery);
+
+    if (extracted) {
+      setMapLocation({ label: extracted, source: "mention" });
+    } else if (trimmedQuery && trimmedQuery.length <= 60) {
+      setMapLocation({ label: trimmedQuery, source: "mention" });
+    } else if (userLocation) {
+      setMapLocation(userLocation);
+    }
   };
 
   const handleBackToSearch = () => {
     setIsSearching(false);
     setCurrentQuery("");
     setSessionId("");
+    setMapLocation(userLocation);
   };
 
   const handleSessionClick = (sessionId: string) => {
@@ -49,18 +155,56 @@ export function ScoutHome() {
     console.log("Loading session:", sessionId);
   };
 
+  const handleUserMessageLocation = useCallback((message: string) => {
+    const extracted = extractLocationFromText(message);
+    if (!extracted) {
+      return;
+    }
+
+    setMapLocation({ label: extracted, source: "mention" });
+  }, []);
+
   if (isSearching) {
     return (
       <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <Button
-          variant="ghost"
-          onClick={handleBackToSearch}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          New Search
-        </Button>
-        <ChatInterface initialQuery={currentQuery} sessionId={sessionId} />
+        <div className="flex flex-col gap-4">
+          <Button variant="ghost" onClick={handleBackToSearch} className="w-max">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            New Search
+          </Button>
+          {formatLocationLabel(mapLocation ?? userLocation) && (
+            <p className="text-sm text-muted-foreground">
+              Map is centered on{" "}
+              <span className="font-medium">
+                {formatLocationLabel(mapLocation ?? userLocation)}
+              </span>
+              .
+            </p>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+          <div className="xl:col-span-3">
+            <ChatInterface
+              initialQuery={currentQuery}
+              sessionId={sessionId}
+              onUserMessage={handleUserMessageLocation}
+            />
+          </div>
+          <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold">Destination Map</h2>
+              <p className="text-sm text-muted-foreground">
+                Scout will drop recommended spots for this area as your chat
+                unfolds.
+              </p>
+            </div>
+            <MapView
+              className="h-[300px] xl:h-[600px]"
+              userLocation={userLocation}
+              focusedLocation={mapLocation ?? userLocation}
+            />
+          </div>
+        </div>
       </div>
     );
   }
@@ -159,4 +303,3 @@ export function ScoutHome() {
     </div>
   );
 }
-

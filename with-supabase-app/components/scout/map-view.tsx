@@ -2,19 +2,55 @@
 
 import { MapPin, Navigation } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-interface MapViewProps {
-  userLocation?: {
-    city?: string;
-    country?: string;
-    lat?: number;
-    lng?: number;
-  };
+type MapLocationSource = "user" | "mention";
+
+interface MapLocation {
+  city?: string;
+  country?: string;
+  lat?: number;
+  lng?: number;
+  label?: string;
+  source?: MapLocationSource;
 }
 
-export function MapView({ userLocation }: MapViewProps) {
+interface MapViewProps {
+  userLocation?: MapLocation;
+  focusedLocation?: MapLocation;
+  className?: string;
+}
+
+export function MapView({
+  userLocation,
+  focusedLocation,
+  className,
+}: MapViewProps) {
+  const activeLocation = focusedLocation ?? userLocation;
+  const isChatLocation =
+    (focusedLocation?.source ?? activeLocation?.source) === "mention";
+  const locationLabel =
+    activeLocation?.label ??
+    [activeLocation?.city, activeLocation?.country].filter(Boolean).join(", ") ||
+    undefined;
+  const markerPulseClass = isChatLocation ? "bg-amber-400/40" : "bg-primary/20";
+  const markerColorClass = isChatLocation
+    ? "bg-amber-500 text-white"
+    : "bg-primary text-primary-foreground";
+  const statusBadge = isChatLocation ? "Chat destination" : "Current location";
+  const subtitle = isChatLocation
+    ? "Showing the place mentioned in chat"
+    : userLocation
+    ? "Centered on your current location"
+    : "We'll center the map once a location is available";
+
   return (
-    <Card className="w-full h-[300px] relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-950">
+    <Card
+      className={cn(
+        "relative w-full h-[300px] overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-950",
+        className,
+      )}
+    >
       {/* Mock map background */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-10 left-10 w-32 h-32 rounded-full bg-blue-300 blur-3xl" />
@@ -36,32 +72,39 @@ export function MapView({ userLocation }: MapViewProps) {
       {/* User location marker */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative">
-          <div className="absolute -inset-8 bg-primary/20 rounded-full animate-ping" />
-          <div className="relative bg-primary text-primary-foreground p-4 rounded-full shadow-lg">
-            <Navigation className="h-6 w-6" fill="currentColor" />
+          <div
+            className={cn(
+              "absolute -inset-8 rounded-full animate-ping",
+              markerPulseClass,
+            )}
+          />
+          <div
+            className={cn(
+              "relative p-4 rounded-full shadow-lg",
+              markerColorClass,
+            )}
+          >
+            <Navigation className="h-6 w-6" />
           </div>
         </div>
       </div>
 
       {/* Location label */}
-      {userLocation && (
-        <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">
-            {userLocation.city
-              ? `${userLocation.city}, ${userLocation.country}`
-              : "Detecting location..."}
-          </span>
+      <div className="absolute bottom-4 left-4 min-w-[220px] rounded-2xl bg-background/90 px-4 py-2 shadow-lg backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <MapPin className="h-3.5 w-3.5 text-primary" />
+          {statusBadge}
         </div>
-      )}
+        <span className="text-sm font-semibold text-foreground">
+          {locationLabel ?? "Detecting location..."}
+        </span>
+        <span className="text-xs text-muted-foreground">{subtitle}</span>
+      </div>
 
       {/* Map info overlay */}
-      <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg">
-        <span className="text-xs font-medium text-muted-foreground">
-          Interactive map coming soon
-        </span>
+      <div className="absolute top-4 right-4 rounded-full bg-background/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur-sm">
+        Recommendations will appear here soon
       </div>
     </Card>
   );
 }
-
