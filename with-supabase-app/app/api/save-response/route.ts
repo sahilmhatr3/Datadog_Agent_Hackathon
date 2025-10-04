@@ -14,13 +14,11 @@ export async function POST(req: Request) {
             // Directory might already exist, ignore error
         }
 
-        // Generate filename with timestamp and session ID
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const sessionId = data.sessionId?.replace(/[^a-zA-Z0-9-]/g, '') || 'unknown';
-        const filename = `linkup-response-${sessionId}-${timestamp}.json`;
+        // Always save to the same file: linkup-responses.json
+        const filename = 'linkup-responses.json';
         const filepath = join(responsesDir, filename);
 
-        // Write the response data to JSON file
+        // Write the response data to JSON file (overwrites previous content)
         await writeFile(filepath, JSON.stringify(data, null, 2));
 
         console.log(`Response saved to: ${filepath}`);
