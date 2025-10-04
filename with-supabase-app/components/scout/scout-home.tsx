@@ -183,25 +183,11 @@ export function ScoutHome() {
           )}
         </div>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-          <div className="xl:col-span-3">
+          <div className="xl:col-span-4"> {/* <--- Changed from 3 to 4 */}
             <ChatInterface
               initialQuery={currentQuery}
               sessionId={sessionId}
               onUserMessage={handleUserMessageLocation}
-            />
-          </div>
-          <div className="space-y-4 xl:col-span-2">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold">Destination Map</h2>
-              <p className="text-sm text-muted-foreground">
-                Scout will drop recommended spots for this area as your chat
-                unfolds.
-              </p>
-            </div>
-            <MapView
-              className="h-[300px] xl:h-[600px]"
-              userLocation={userLocation}
-              focusedLocation={mapLocation ?? userLocation}
             />
           </div>
         </div>
