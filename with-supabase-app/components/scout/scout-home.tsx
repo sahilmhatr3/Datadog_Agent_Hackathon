@@ -300,8 +300,8 @@ export function ScoutHome() {
 
   if (isSearching) {
     return (
-      <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex flex-col gap-4">
+      <div className="fixed inset-0 top-16 left-0 right-0 bottom-0 flex flex-col w-screen bg-background z-40">
+        <div className="flex flex-col gap-4 px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-4">
           <Button variant="ghost" onClick={handleBackToSearch} className="w-max">
             <ArrowLeft className="mr-2 h-4 w-4" />
             New Search
@@ -316,32 +316,12 @@ export function ScoutHome() {
             </p>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-          <div className="xl:col-span-3">
-            <ChatInterface
-              initialQuery={currentQuery}
-              sessionId={sessionId}
-              onUserMessage={handleUserMessageLocation}
-            />
-          </div>
-          <div className="space-y-4 xl:col-span-2">
-            <InviteCollaboratorCard
-              sessionId={sessionId}
-              currentQuery={currentQuery}
-            />
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold">Destination Map</h2>
-              <p className="text-sm text-muted-foreground">
-                Scout will drop recommended spots for this area as your chat
-                unfolds.
-              </p>
-            </div>
-            <MapView
-              className="h-[300px] xl:h-[600px]"
-              userLocation={userLocation}
-              focusedLocation={mapLocation ?? userLocation}
-            />
-          </div>
+        <div className="flex-1 px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 overflow-hidden">
+          <ChatInterface
+            initialQuery={currentQuery}
+            sessionId={sessionId}
+            onUserMessage={handleUserMessageLocation}
+          />
         </div>
       </div>
     );
