@@ -69,6 +69,21 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  recommendations?: Recommendation[];
+}
+
+interface Recommendation {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  score: number;
+  reasons: any;
+  address: string;
+  price: string;
+  tags: string[];
+  amenities: string[];
+  url?: string;
 }
 
 interface ChatInterfaceProps {
@@ -104,15 +119,60 @@ export function ChatInterface({
       };
       setMessages([initialMessage]);
       
-      // Mock AI response
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: `Great! I can help you plan your trip based on: "${initialQuery}". What specific preferences do you have? (cuisine, budget, vibes, etc.)`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiResponse]);
+      // Process initial query
+      setTimeout(async () => {
+        setIsLoading(true);
+        try {
+          const response = await fetch('/api/scout-process', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              query: initialQuery,
+              sessionId: sessionId 
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            let aiContent = `I found some great options based on: "${initialQuery}".\n\n`;
+            if (data.recommendations && data.recommendations.length > 0) {
+              aiContent += "Here are my top recommendations:";
+            } else {
+              aiContent += "What specific preferences do you have? (cuisine, budget, vibes, atmosphere, dietary restrictions, etc.)";
+            }
+            
+            const aiResponse: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: aiContent,
+              timestamp: new Date(),
+              recommendations: data.recommendations || []
+            };
+            setMessages((prev) => [...prev, aiResponse]);
+          } else {
+            const aiResponse: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `Great! I can help you plan your trip based on: "${initialQuery}". What specific preferences do you have? (cuisine, budget, vibes, etc.)`,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, aiResponse]);
+          }
+        } catch (error) {
+          console.error('Error processing initial query:', error);
+          const aiResponse: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Great! I can help you plan your trip based on: "${initialQuery}". What specific preferences do you have? (cuisine, budget, vibes, etc.)`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, aiResponse]);
+        } finally {
+          setIsLoading(false);
+        }
       }, 1000);
     }
   }, [initialQuery]);
@@ -144,13 +204,16 @@ export function ChatInterface({
     setIsLoading(true);
 
     try {
-      // Call the Linkup API
-      const response = await fetch('/api/linkup', {
+      // Call the Scout process API
+      const response = await fetch('/api/scout-process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: trimmedInput }),
+        body: JSON.stringify({ 
+          query: trimmedInput,
+          sessionId: sessionId 
+        }),
       });
 
       if (!response.ok) {
@@ -158,31 +221,31 @@ export function ChatInterface({
       }
 
       const data = await response.json();
+      console.log('Scout API response:', data);
+      console.log('Recommendations:', data.recommendations);
       
-      // Save the Linkup response to a JSON file
-      const responseData = {
-        sessionId: sessionId || `session-${Date.now()}`,
-        query: trimmedInput,
-        response: data,
-        timestamp: new Date().toISOString(),
-        userMessage: userMessage
-      };
-
-      // Save to JSON file via API endpoint
-      await fetch('/api/save-response', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(responseData),
-      });
+      // Create AI response with recommendations
+      let aiContent = "Based on your preferences, here are my recommendations:\n\n";
       
-      // Show a generic confirmation message instead of the actual response
+      if (data.recommendations && data.recommendations.length > 0) {
+        // Add text summary
+        console.log('First recommendation:', data.recommendations[0]);
+        aiContent += data.recommendations.slice(0, 5).map((rec: Recommendation, index: number) => {
+          console.log(`Recommendation ${index}:`, rec);
+          const name = rec.name || `Place ${index + 1}`;
+          const desc = rec.description || 'Great dining option';
+          return `${index + 1}. **${name}** - ${rec.category || 'restaurant'}\n   ${desc.slice(0, 100)}...\n   Price: ${rec.price || '$$'} | Score: ${rec.score || 80}/100`;
+        }).join('\n\n');
+      } else {
+        aiContent = "I couldn't find specific recommendations based on your query. Could you provide more details about what you're looking for?";
+      }
+      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I've processed your request and saved the information. The response has been logged for analysis.",
+        content: aiContent,
         timestamp: new Date(),
+        recommendations: data.recommendations || []
       };
 
       setMessages((prev) => [...prev, aiMessage]);
@@ -293,7 +356,61 @@ export function ChatInterface({
                                     : "bg-muted"
                                 }`}
                             >
-                                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                <div className="text-sm whitespace-pre-wrap">
+                                    {message.content.split('\n').map((line, idx) => {
+                                        // Parse basic markdown: **bold**
+                                        const parsedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                                        return (
+                                            <div key={idx} dangerouslySetInnerHTML={{ __html: parsedLine }} />
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* Display recommendations as cards */}
+                                {message.recommendations && message.recommendations.length > 0 && (
+                                    <div className="mt-4 space-y-3">
+                                        {message.recommendations.slice(0, 5).map((rec) => (
+                                            <Card key={rec.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1">
+                                                        <h4 className="font-semibold text-base">{rec.name || 'Restaurant Name'}</h4>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {rec.category || 'restaurant'} • {rec.price || '$$'} • Score: {rec.score || 80}/100
+                                                        </p>
+                                                        <p className="text-sm mt-2 line-clamp-2">{rec.description || 'A great place to dine with romantic ambiance.'}</p>
+                                                        {rec.address && (
+                                                            <p className="text-xs text-muted-foreground mt-2">
+                                                                📍 {rec.address}
+                                                            </p>
+                                                        )}
+                                                        {rec.tags.length > 0 && (
+                                                            <div className="flex gap-1 mt-2">
+                                                                {rec.tags.map((tag) => (
+                                                                    <span key={tag} className="px-2 py-1 bg-primary/10 text-xs rounded-full">
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {rec.url && (
+                                                        <a 
+                                                            href={rec.url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="ml-4 text-primary hover:text-primary/80"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                            </svg>
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1 px-1">
                                 {message.timestamp.toLocaleTimeString([], {

@@ -1,0 +1,50 @@
+{
+  "sessionId": "session-1759605873734",
+  "query": "Today",
+  "processorResult": {
+    "session_id": "session-1759605873734",
+    "prompt": "Find me a lunch spot to go out to with my college friends in new york\nToday",
+    "parameters": {
+      "category": null,
+      "event_type": null,
+      "amenities": [],
+      "dietary_restrictions": [],
+      "price_range": null,
+      "location_context": null,
+      "destination": null,
+      "origin": null,
+      "route_preference": null,
+      "time_preference": null,
+      "specific_time": null,
+      "day_preference": "today",
+      "party_size": null,
+      "vibe": null,
+      "accessibility_needs": []
+    },
+    "meta": {
+      "messages_received": 3,
+      "user_messages_processed": 2,
+      "used_full_history": true,
+      "used_openhands": true,
+      "processed_at": "2025-10-04T19:24:39.013682+00:00"
+    }
+  },
+  "history": [
+    {
+      "role": "user",
+      "content": "Find me a lunch spot to go out to with my college friends in new york",
+      "timestamp": "2025-10-04T19:24:33.742Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Great! I'm excited to help you with \"Find me a lunch spot to go out to with my college friends in new york\". To create the perfect itinerary for you, I'd love to know a bit more:\n\n• What dates are you planning to visit?\n• How many people will be in your group?\n• What's your preferred vibe? (e.g., romantic, adventurous, foodie, luxury)\n• Any specific budget in mind?",
+      "timestamp": "2025-10-04T19:24:33.742Z"
+    },
+    {
+      "role": "user",
+      "content": "Today",
+      "timestamp": "2025-10-04T19:24:38.656Z"
+    }
+  ],
+  "timestamp": "2025-10-04T19:24:39.015Z"
+}
