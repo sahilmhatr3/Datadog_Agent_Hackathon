@@ -11,14 +11,22 @@ import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 // Assuming these are imported correctly from the file structure
-import { MapView, Route } from "./map-view"; 
+import { MapView, type Route as MapRoute } from "./map-view"; 
 import { RoutePicker } from "./route-picker"; 
 
 
 // --- Route Data (Mocking dummy_route_data.json) ---
-// (Keep this data as it was defined previously)
-interface RouteStop { address: string; /* ... */ }
-export interface Route { route_id: string; description: string; stops: RouteStop[]; /* ... */ }
+interface RouteStop { 
+  stop_name: string;
+  address: string;
+  category: string;
+}
+
+export interface Route { 
+  route_id: string; 
+  description: string; 
+  stops: RouteStop[];
+}
 
 const DUMMY_ROUTES: Route[] = [
   // ... (Full DUMMY_ROUTES array)
@@ -56,9 +64,18 @@ const DUMMY_ROUTES: Route[] = [
 
 
 // --- Chat Interface Logic ---
-interface Message { /* ... */ }
-interface ChatInterfaceProps { /* ... */ }
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
 
+interface ChatInterfaceProps {
+  initialQuery: string;
+  sessionId: string;
+  onUserMessage?: (message: string) => void;
+}
 
 export function ChatInterface({
   initialQuery,
@@ -101,10 +118,10 @@ export function ChatInterface({
 
   // --- UPDATED LAYOUT RETURN BLOCK ---
   return (
-    <div className="flex w-full max-w-7xl mx-auto h-[90vh] shadow-xl rounded-xl overflow-hidden bg-white">
+    <div className="flex flex-col lg:flex-row w-full h-full shadow-xl rounded-xl overflow-hidden bg-white">
       
-      {/* LEFT COLUMN: Chat Interface and Route Picker (NOW WIDER: w-3/4) */}
-      <div className="flex flex-col w-full md:w-3/4 h-full"> {/* <-- MODIFIED: w-3/4 */}
+      {/* LEFT COLUMN: Chat Interface and Route Picker */}
+      <div className="flex flex-col w-full lg:w-1/2 h-full">{/* 50% on large screens, full width on mobile */}
 
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/5 to-primary/10 flex-shrink-0">
@@ -225,11 +242,11 @@ export function ChatInterface({
         </Card>
       </div>
       
-      {/* RIGHT COLUMN: Interactive Map (NOW NARROWER: w-1/4) */}
-      <div className="hidden md:flex flex-col w-1/4 h-full border-l p-0"> {/* <-- MODIFIED: w-1/4 */}
+      {/* RIGHT COLUMN: Interactive Map - Now Much Wider */}
+      <div className="hidden lg:flex flex-col w-full lg:w-1/2 h-full border-l p-0">{/* 50% on large screens, hidden on mobile/tablet */}
           <MapView 
               className="h-full w-full shadow-none rounded-none"
-              activeRoute={activeRoute}
+              activeRoute={activeRoute ?? undefined}
           />
       </div>
 
