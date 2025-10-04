@@ -1,0 +1,380 @@
+Here’s a drop-in **`.cursorrules`** you can place at your repo root so Cursor “knows” your itinerary data model, relationships, and how to query it from Supabase + Next.js. It includes: schema summary, RLS constraints, common queries, TS types, and safe patterns.
+
+> Save as: **`.cursorrules`** (Markdown) at the project root.
+
+````md
+# Cursor Rules — Itinerary Builder (Supabase + Next.js)
+
+These rules give Cursor the shared context for our database schema, access patterns, and coding conventions. Prefer correctness over cleverness. Assume Supabase JS client (v2), Next.js App Router, and server actions/Edge Functions for privileged ops.
+
+---
+
+## What this project is
+A multi-user itinerary builder. Users create **sessions** (group planning contexts), invite **participants**, define **requirements** (vibes, event types, constraints), get **recommendations** of **places**, and assemble **itineraries** with **itinerary_items**. We record per-user **history** (saved/liked/booked/hidden).
+
+---
+
+## Postgres Enums
+
+- `vibe`: `chill | romantic | adventurous | luxury | budget | kid_friendly | nightlife | foodie | outdoors | arts_culture | wellness`
+- `event_type`: `restaurant | bar | cafe | club | museum | concert | theater | hike | tour | shopping | sports | workshop | spa`
+- `price_tier`: `free | $ | $$ | $$$ | $$$$`
+- `participant_role`: `owner | editor | viewer`
+- `user_place_status`: `saved | liked | booked | hidden`
+
+---
+
+## Tables (high-level)
+
+**profiles**  
+- `id (uuid, pk, fk auth.users)`, `display_name`, `home_city`, `home_country`, `tz`, `created_at`
+- Auto-created via trigger on `auth.users` insert.
+
+**sessions**  
+- `id (uuid, pk)`, `owner_id (fk auth.users)`, `title`, `origin_*`, `destination_*`, `start_time`, `end_time`, `created_at`
+- One session per planning context.
+
+**session_participants**  
+- PK `(session_id, user_id)`; `role`
+- Links users to sessions with roles: `owner/editor/viewer`.
+
+**session_requirements** (append-only snapshots)  
+- `id`, `session_id`, `created_by`, `vibes vibe[]`, `event_types event_type[]`, `min_party_size`, `max_party_size`, `price_min/max`, `accessibility jsonb`, `notes`, `created_at`
+- Read “latest” by most recent `created_at`.
+
+**places**  
+- `id`, `name`, `event_type`, `price`, `tags text[]`, `city`, `country`, `address_line`, `lat`, `lng`, `geo geography(Point,4326)`, `hours jsonb`, `external_source`, `external_id`, `created_at`
+- Trigger keeps `geo` synced from `lat/lng`. Indexed for event_type/tags/geo.
+
+**search_runs**  
+- `id`, `session_id`, `user_id`, `inputs jsonb`, `results_count`, `created_at`
+- Records each match computation (auditability).
+
+**recommendations**  
+- `id`, `search_run_id`, `session_id`, `user_id`, `place_id`, `match_score numeric(5,2)`, `reasons jsonb`, `created_at`
+- Unique per `(search_run_id, place_id, user_id)`.
+
+**itineraries**  
+- `id`, `session_id`, `created_by`, `title`, `created_at`
+
+**itinerary_items**  
+- `id`, `itinerary_id`, `place_id`, `scheduled_start`, `scheduled_end`, `notes`, `added_by`, `created_at`
+
+**user_place_history**  
+- PK `(user_id, place_id, status)` with `status ∈ {saved, liked, booked, hidden}`
+- Optional `source_session_id` for provenance.
+
+**v_user_session_top_matches (view)**  
+- Latest recommendation per `(user_id, session_id, place_id)`.
+
+---
+
+## Row-Level Security (RLS) — key facts Cursor must respect
+- **profiles**: a user can `select/update` **only** their own row.
+- **places**: `select` allowed to any **authenticated** user; write normally via service role (Edge Function).
+- **sessions**: `select` for owner or participant; `insert` only if `owner_id = auth.uid()`; `update` for owner or `editor`.
+- **session_participants**: visible to members; **only owner** can add/remove.
+- **session_requirements**: visible to members; insert allowed to a member as `created_by = auth.uid()`.
+- **search_runs** / **recommendations**: visible to the run owner and session members; inserts restricted to `user_id = auth.uid()`.
+- **itineraries**/**itinerary_items**: visible to members; writes for members/owner per policy.
+- **user_place_history**: visible/writable **only** by the user themself.
+
+> **Implication:** Client components must perform writes as the signed-in user within policy. Bulk/privileged writes (e.g., mass recommendations) should run in server context with the **service role key** (Edge Function or server action) — never ship that key to the client.
+
+---
+
+## Query patterns (SQL the model expects)
+
+**Latest requirements for a session**
+```sql
+select *
+from public.session_requirements
+where session_id = :session_id
+order by created_at desc
+limit 1;
+````
+
+**Places by vibe + event types + city**
+
+```sql
+-- Vibe is modeled as tags or inferred by your matcher. For a starter filter:
+select p.*
+from public.places p
+where (p.event_type = any(:event_types)::event_type[])
+  and (p.city = :city and p.country = :country)
+order by p.created_at desc
+limit 50;
+```
+
+**Geo search (if PostGIS enabled)**
+
+```sql
+select p.*, ST_Distance(p.geo, ST_SetSRID(ST_MakePoint(:lng,:lat),4326)::geography) as meters
+from public.places p
+where p.geo is not null
+  and ST_DWithin(p.geo, ST_SetSRID(ST_MakePoint(:lng,:lat),4326)::geography, :radius_meters)
+order by meters asc
+limit 50;
+```
+
+**Record a search run and recommendations (server/Edge)**
+
+```sql
+insert into public.search_runs (session_id, user_id, inputs)
+values (:session_id, :user_id, :inputs)
+returning id;
+
+-- then bulk insert recs
+insert into public.recommendations (search_run_id, session_id, user_id, place_id, match_score, reasons)
+select :run_id, :session_id, :user_id, r.place_id, r.score, r.reasons
+from jsonb_to_recordset(:results_json) as r(place_id uuid, score numeric, reasons jsonb);
+```
+
+**Save/like a place for the current user**
+
+```sql
+insert into public.user_place_history (user_id, place_id, status, source_session_id)
+values (auth.uid(), :place_id, 'saved', :session_id)
+on conflict (user_id, place_id, status) do nothing;
+```
+
+---
+
+## Supabase Client (TypeScript) — safe usage patterns
+
+**Client for browser (RLS-constrained)**
+
+```ts
+import { createBrowserClient } from '@supabase/ssr';
+
+export const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+```
+
+**Client for server actions / route handlers (RLS-aware session)**
+
+```ts
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+export function getServerSupabase() {
+  const cookieStore = cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) { return cookieStore.get(name)?.value; },
+      },
+    }
+  );
+}
+```
+
+**Service-role client (Edge Function only)**
+
+```ts
+// Edge Function or secure server only – NEVER in client bundles
+import { createClient } from '@supabase/supabase-js';
+
+export const admin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // secret
+);
+```
+
+---
+
+## Example: run matcher on server and persist recs
+
+```ts
+type MatchInput = {
+  sessionId: string;
+  userId: string;
+  vibes: ('foodie'|'nightlife'|'chill')[];
+  eventTypes: ('restaurant'|'bar'|'cafe')[];
+  destination: { city: string; country: string };
+};
+
+type MatchResult = { place_id: string; score: number; reasons: Record<string, any> };
+
+export async function runAndStoreMatches(input: MatchInput): Promise<MatchResult[]> {
+  // 1) fetch candidate places (RLS allows read to authenticated users)
+  const server = getServerSupabase();
+  const { data: places, error } = await server
+    .from('places')
+    .select('id, event_type, tags, city, country, price')
+    .eq('city', input.destination.city)
+    .eq('country', input.destination.country)
+    .in('event_type', input.eventTypes);
+
+  if (error) throw error;
+
+  // 2) simple in-app scoring (replace with your real scorer)
+  const scored: MatchResult[] = (places ?? []).map(p => {
+    const vibeHit = p.tags?.some((t: string) => input.vibes.includes(t as any)) ? 20 : 0;
+    const base = 60;
+    return { place_id: p.id, score: base + vibeHit, reasons: { tags_hit: !!vibeHit } };
+  }).sort((a, b) => b.score - a.score).slice(0, 20);
+
+  // 3) record search_run (must use user-scoped client; user_id must equal auth.uid() under RLS)
+  const inputs = { vibes: input.vibes, event_types: input.eventTypes, destination: input.destination };
+  const { data: run, error: runErr } = await server
+    .from('search_runs')
+    .insert([{ session_id: input.sessionId, user_id: input.userId, inputs }])
+    .select('id')
+    .single();
+
+  if (runErr) throw runErr;
+
+  // 4) bulk insert recommendations
+  const rows = scored.map(r => ({
+    search_run_id: run.id,
+    session_id: input.sessionId,
+    user_id: input.userId,
+    place_id: r.place_id,
+    match_score: r.score,
+    reasons: r.reasons
+  }));
+
+  const { error: recErr } = await server.from('recommendations').insert(rows);
+  if (recErr) throw recErr;
+
+  // 5) optionally mark as 'saved' in user_place_history (idempotent)
+  const historyRows = scored.map(r => ({
+    user_id: input.userId,
+    place_id: r.place_id,
+    status: 'saved' as const,
+    source_session_id: input.sessionId
+  }));
+  // Conflict key: (user_id, place_id, status)
+  await server.from('user_place_history').upsert(historyRows, {
+    onConflict: 'user_id,place_id,status',
+    ignoreDuplicates: true
+  });
+
+  return scored;
+}
+```
+
+---
+
+## Common UI flows Cursor should scaffold
+
+1. **Create session & invite**
+
+* Insert `sessions(owner_id=auth.uid())`
+* Insert `session_participants` rows (`owner` for creator; `editor/viewer` for others)
+
+2. **Collect intent**
+
+* Insert into `session_requirements` (append-only)
+
+3. **Run matcher**
+
+* Create `search_runs`
+* Insert `recommendations` (per user)
+* (Optional) Upsert `user_place_history` with `status='saved'`
+
+4. **Build itinerary**
+
+* Create `itineraries(session_id, created_by)`
+* Add `itinerary_items(place_id, scheduled_*, notes)`
+
+5. **Show history**
+
+* `select * from user_place_history where user_id = auth.uid() order by created_at desc`
+
+---
+
+## Seeds and ergonomics
+
+* Minimal seed for local dev:
+
+  * A few `places` for your typical cities; include `tags` that overlap enum `vibe` values (e.g., `{'foodie','nightlife'}`).
+  * A demo `session` + `session_participants`.
+  * One `session_requirements` snapshot.
+
+```sql
+insert into public.places (name, event_type, price, tags, city, country, lat, lng)
+values
+('Julietta Trattoria','restaurant','$$', array['foodie','romantic'], 'New York', 'USA', 40.72, -74.00),
+('Atlas Rooftop','bar','$$$', array['nightlife','luxury'], 'New York', 'USA', 40.73, -73.99);
+```
+
+---
+
+## Guardrails
+
+* Do **not** attempt to write as another user; RLS will block you.
+* Use **service role** only in Edge/Server for bulk or cross-user tasks; keep keys out of client bundles.
+* When reading latest requirements, always order by `created_at desc limit 1`.
+* For geo search, only use `ST_DWithin` when `geo` is not null; fall back to city/country otherwise.
+* When upserting history, use `onConflict: 'user_id,place_id,status'`.
+
+---
+
+## Quick ERD (mental model)
+
+profiles (1)───(n) sessions (owner)
+sessions (1)───(n) session_participants (user_id, role)
+sessions (1)───(n) session_requirements (snapshots)
+sessions (1)───(n) itineraries ───(n) itinerary_items──(1) places
+sessions (1)───(n) search_runs (per user) ───(n) recommendations──(1) places
+auth.users (1)───(n) user_place_history (per place/status)
+
+---
+
+## Useful snippets Cursor may inline
+
+**Latest matches view (already provided)**
+
+```sql
+select * from public.v_user_session_top_matches
+where user_id = auth.uid() and session_id = :session_id
+order by match_score desc
+limit 20;
+```
+
+**Add participant (owner only)**
+
+```ts
+await server.from('session_participants').insert([
+  { session_id, user_id: inviteeId, role: 'editor' }
+]);
+```
+
+**Create itinerary from top N recs**
+
+```ts
+const { data: itin } = await server.from('itineraries')
+  .insert([{ session_id, created_by: userId, title }])
+  .select('id')
+  .single();
+
+const items = recs.slice(0, N).map(r => ({
+  itinerary_id: itin!.id,
+  place_id: r.place_id,
+  notes: `Auto-added from rec score ${r.match_score}`,
+  added_by: userId
+}));
+await server.from('itinerary_items').insert(items);
+```
+
+---
+
+## File map hints for Cursor
+
+* **/db/schema.sql** — authoritative schema (mirrors the SQL we created).
+* **/lib/supabase/** — client factories (`getServerSupabase`, `createBrowserClient`, `admin`).
+* **/app/(routes)/** — Next.js routes and server actions.
+* **/edge-functions/** — privileged jobs (bulk recs, third-party ingest).
+
+Cursor: when asked to write queries or server actions, prefer the patterns above and respect RLS. Default to returning typed objects with explicit column lists instead of `*`.
+
+```
+
+If you’d rather keep `.cursorrules` lighter, I can split “schema facts” into `docs/itinerary-schema.md` and keep rules minimal—but the single file above is enough for Cursor to generate accurate code against your DB.
+```
