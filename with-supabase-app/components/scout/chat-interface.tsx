@@ -76,25 +76,64 @@ export function ChatInterface({
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response (mock for now)
-    setTimeout(() => {
-      const responses = [
-        "Perfect! Based on your preferences, I'm finding some amazing options for you. Would you like me to focus on any specific neighborhoods or areas?",
-        "Great choices! I'm curating a personalized itinerary. Should I include any specific cuisines or activities you're interested in?",
-        "Excellent! I'm compiling recommendations that match your vibe. Any dietary restrictions or accessibility needs I should know about?",
-        "Thanks for that info! I'm building your custom itinerary now. Would you like me to include time for rest between activities?",
-      ];
+    try {
+      // Call the Linkup API
+      const response = await fetch('/api/linkup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: trimmedInput }),
+      });
 
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Save the Linkup response to a JSON file
+      const responseData = {
+        sessionId: sessionId || `session-${Date.now()}`,
+        query: trimmedInput,
+        response: data,
+        timestamp: new Date().toISOString(),
+        userMessage: userMessage
+      };
+
+      // Save to JSON file via API endpoint
+      await fetch('/api/save-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(responseData),
+      });
+      
+      // Show a generic confirmation message instead of the actual response
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: "I've processed your request and saved the information. The response has been logged for analysis.",
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error calling Linkup API:', error);
+      
+      // Fallback to a helpful error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm sorry, I'm having trouble accessing my knowledge base right now. Please try again in a moment, or rephrase your question.",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
