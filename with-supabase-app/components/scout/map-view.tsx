@@ -59,7 +59,7 @@ export function MapView({
     ? encodeURIComponent(locationLabel) 
     : (activeLocation?.lat && activeLocation?.lng 
         ? `${activeLocation.lat},${activeLocation.lng}` 
-        : "New York, NY");
+        : encodeURIComponent("New York, NY"));
   
   let statusBadge: string;
   let subtitle: string;
