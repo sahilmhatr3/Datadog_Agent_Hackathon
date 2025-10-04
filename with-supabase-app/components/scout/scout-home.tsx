@@ -334,39 +334,14 @@ export function ScoutHome() {
       {/* Map and Sessions Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-8">
         {/* Map Section - Takes 2 columns on large screens */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-xl font-semibold">Your Location</h2>
           </div>
-          <MapView userLocation={userLocation} />
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-4 pt-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                12
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Sessions Created
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                48
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Places Saved
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                5
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Cities Explored
-              </div>
-            </div>
-          </div>
+          <MapView
+            userLocation={userLocation}
+            className="min-h-[360px] sm:min-h-[420px]"
+          />
         </div>
 
         {/* Previous Sessions - Takes 1 column */}
@@ -375,8 +350,36 @@ export function ScoutHome() {
         </div>
       </div>
 
+      {/* Quick Stats - Separate section */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            12
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Sessions Created
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            48
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Places Saved
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            5
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Cities Explored
+          </div>
+        </div>
+      </div>
+
       {/* Quick Actions */}
-      <div className="pt-8 border-t">
+      <div className="border-t pt-8">
         <h3 className="text-lg font-semibold mb-4">Popular Searches</h3>
         <div className="flex flex-wrap gap-2">
           {[
