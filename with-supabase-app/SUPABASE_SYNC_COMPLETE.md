@@ -22,11 +22,15 @@
 - `price_tier` (free, $, $$, $$$, $$$$)
 - `participant_role` (owner, editor, viewer)
 - `user_place_status` (saved, liked, booked, hidden)
+- `invite_status` (pending, accepted, declined, expired)
 
 ✅ All the tables:
 - `profiles`
 - `sessions`
 - `session_participants`
+- `session_invites`
+- `session_participant_snapshots`
+- `session_collaboration_summaries`
 - `session_requirements`
 - `places` (with PostGIS support)
 - `search_runs`
